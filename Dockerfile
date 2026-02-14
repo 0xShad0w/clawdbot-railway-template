@@ -77,19 +77,7 @@ su - linuxbrew -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githu
 su - linuxbrew -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew update' && \
 chmod -R go+w /home/linuxbrew/.linuxbrew && \
 # Simple wrapper: run as linuxbrew user when called as root
-cat > /usr/local/bin/brew << 'EOF'
-#!/bin/bash
-if [ "$(id -u)" = "0" ]; then
-  CMD="eval \$(/home/linuxbrew/.linuxbrew/bin/brew shellenv) && brew"
-  for arg in "$@"; do
-    CMD="$CMD $(printf '%q' "$arg")"
-  done
-  exec su -s /bin/bash linuxbrew -c "$CMD"
-else
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-  exec /home/linuxbrew/.linuxbrew/bin/brew "$@"
-fi
-EOF
+printf '#!/bin/bash\nif [ "$(id -u)" = "0" ]; then\n  CMD="eval \\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv) && brew"\n  for arg in "$@"; do\n    CMD="$CMD $(printf '\''%%q'\'' "$arg")"\n  done\n  exec su -s /bin/bash linuxbrew -c "$CMD"\nelse\n  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n  exec /home/linuxbrew/.linuxbrew/bin/brew "$@"\nfi\n' > /usr/local/bin/brew && \
 chmod +x /usr/local/bin/brew
 
 # Set up Homebrew environment variables (covers both standard and root installation paths)
