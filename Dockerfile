@@ -27,18 +27,38 @@ done
 
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm build
+ENV OPENCLAW_PREFER_PNPM=1
+RUN pnpm ui:install && pnpm ui:build
 
+# Runtime image
 FROM node:22-bookworm
 ENV NODE_ENV=production
+
 RUN apt-get update && \
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates && \
-rm -rf /var/lib/apt/lists/*
-RUN corepack enable
-WORKDIR /openclaw
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+ca-certificates \
+&& rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
+
+WORKDIR /app
+
+# Wrapper deps (your original server.js approach)
+COPY package.json ./
+RUN npm install --omit=dev && npm cache clean --force
+
+# Copy built openclaw
 COPY --from=openclaw-build /openclaw /openclaw
 
+# Provide openclaw executable
 RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw \
 && chmod +x /usr/local/bin/openclaw
 
+# Copy your wrapper server
+COPY src ./src
+
+ENV OPENCLAW_PUBLIC_PORT=8080
+ENV PORT=8080
 EXPOSE 8080
-CMD ["openclaw"]
+
+CMD ["node", "src/server.js"]
