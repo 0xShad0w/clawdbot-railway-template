@@ -63,25 +63,20 @@ ln -sf /usr/bin/python3 /usr/bin/python && \
 python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip setuptools wheel
 
 # Install Homebrew for Linux (as recommended by OpenClaw for skills)
-# Homebrew can be installed on Linux and is recommended by OpenClaw for skill dependencies
-RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && \
-# Add Homebrew to PATH - try standard location first, fallback to root location
-if [ -d "/home/linuxbrew/.linuxbrew" ]; then \
-  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
-  /home/linuxbrew/.linuxbrew/bin/brew --version; \
-elif [ -d "/root/.linuxbrew" ]; then \
-  echo 'eval "$(/root/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
-  /root/.linuxbrew/bin/brew --version; \
-else \
-  echo "Warning: Homebrew installation path not found"; \
-fi && \
+# Homebrew requires a non-root user, so we create one and install as that user
+RUN useradd -m -s /bin/bash linuxbrew && \
+# Install Homebrew as the linuxbrew user
+su - linuxbrew -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' && \
+# Make Homebrew available system-wide by adding to PATH
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
 chmod +x /etc/profile.d/brew.sh && \
 # Also add to root's .bashrc
-if [ -d "/home/linuxbrew/.linuxbrew" ]; then \
-  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc; \
-elif [ -d "/root/.linuxbrew" ]; then \
-  echo 'eval "$(/root/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc; \
-fi
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc && \
+# Source the environment and verify installation
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && \
+brew --version && \
+# Make Homebrew directories accessible to all users (for packages installed via brew)
+chmod -R go+w /home/linuxbrew/.linuxbrew
 
 # Set up Homebrew environment variables (covers both standard and root installation paths)
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/root/.linuxbrew/bin:/root/.linuxbrew/sbin:${PATH}"
