@@ -59,8 +59,8 @@ procps \
 && rm -rf /var/lib/apt/lists/* && \
 # Create python symlink for scripts that expect 'python' command
 ln -sf /usr/bin/python3 /usr/bin/python && \
-# Ensure pip is up to date
-python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+# Ensure pip is up to date (--break-system-packages is safe in Docker containers)
+python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip setuptools wheel
 
 # Install Homebrew for Linux (as recommended by OpenClaw for skills)
 # Homebrew can be installed on Linux and is recommended by OpenClaw for skill dependencies
