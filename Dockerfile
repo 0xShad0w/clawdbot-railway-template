@@ -67,16 +67,24 @@ python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip setu
 RUN useradd -m -s /bin/bash linuxbrew && \
 # Install Homebrew as the linuxbrew user
 su - linuxbrew -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' && \
+# Initialize Homebrew's formula database as the linuxbrew user (required before root can use it)
+su - linuxbrew -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew update' && \
+# Create and set permissions for Homebrew cache directory (needed for root usage)
+mkdir -p /home/linuxbrew/.linuxbrew/var/homebrew_cache && \
+chmod -R 777 /home/linuxbrew/.linuxbrew/var && \
 # Make Homebrew available system-wide by adding to PATH
 echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
 chmod +x /etc/profile.d/brew.sh && \
 # Also add to root's .bashrc
 echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc && \
-# Source the environment and verify installation
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && \
-brew --version && \
 # Make Homebrew directories accessible to all users (for packages installed via brew)
-chmod -R go+w /home/linuxbrew/.linuxbrew
+chmod -R go+w /home/linuxbrew/.linuxbrew && \
+# Create a brew wrapper that runs as linuxbrew user when called as root
+# This bypasses Homebrew's root check by executing as the linuxbrew user
+printf '#!/bin/bash\nif [ "$(id -u)" = "0" ]; then\n  su -s /bin/bash linuxbrew -c "eval \\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv) && brew \"$@\""\nelse\n  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && /home/linuxbrew/.linuxbrew/bin/brew "$@"\nfi\n' > /usr/local/bin/brew && \
+chmod +x /usr/local/bin/brew && \
+# Verify installation works
+brew --version
 
 # Set up Homebrew environment variables (covers both standard and root installation paths)
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/root/.linuxbrew/bin:/root/.linuxbrew/sbin:${PATH}"
@@ -85,6 +93,11 @@ ENV HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
 ENV HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 ENV HOMEBREW_NO_AUTO_UPDATE=1
 ENV HOMEBREW_NO_ANALYTICS=1
+# Allow Homebrew to work as root (safe in Docker containers)
+ENV HOMEBREW_FORCE_BREWED_GIT=1
+ENV HOMEBREW_FORCE_BREWED_CURL=1
+# Initialize Homebrew cache directory permissions for root usage
+ENV HOMEBREW_CACHE="/home/linuxbrew/.linuxbrew/var/homebrew_cache"
 
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
