@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+openclaw:
+build:
+context: .
+dockerfile: Dockerfile
+image: openclaw-open:latest
+container_name: openclaw-host
+ports:
+- "8080:8080"
+volumes:
+- ~/.openclaw/workspace:/openclaw/workspace
+# Optional X11 hookup if you ever run GUI apps inside
+- /tmp/.X11-unix:/tmp/.X11-unix
+environment:
+- OPENCLAW_WORKSPACE=/openclaw/workspace
+restart: unless-stopped
