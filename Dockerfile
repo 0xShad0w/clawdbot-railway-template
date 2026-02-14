@@ -34,10 +34,62 @@ RUN pnpm ui:install && pnpm ui:build
 FROM node:22-bookworm
 ENV NODE_ENV=production
 
+# Install system dependencies needed for OpenClaw skills
+# Skills may need build tools, Python, git, and various utilities
 RUN apt-get update && \
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 ca-certificates \
-&& rm -rf /var/lib/apt/lists/*
+git \
+curl \
+wget \
+python3 \
+python3-pip \
+python3-venv \
+make \
+g++ \
+build-essential \
+unzip \
+zip \
+tar \
+xz-utils \
+libssl-dev \
+libffi-dev \
+file \
+procps \
+&& rm -rf /var/lib/apt/lists/* && \
+# Create python symlink for scripts that expect 'python' command
+ln -sf /usr/bin/python3 /usr/bin/python && \
+# Ensure pip is up to date
+python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install Homebrew for Linux (as recommended by OpenClaw for skills)
+# Homebrew can be installed on Linux and is recommended by OpenClaw for skill dependencies
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && \
+# Add Homebrew to PATH - try standard location first, fallback to root location
+if [ -d "/home/linuxbrew/.linuxbrew" ]; then \
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
+  /home/linuxbrew/.linuxbrew/bin/brew --version; \
+elif [ -d "/root/.linuxbrew" ]; then \
+  echo 'eval "$(/root/.linuxbrew/bin/brew shellenv)"' >> /etc/profile.d/brew.sh && \
+  /root/.linuxbrew/bin/brew --version; \
+else \
+  echo "Warning: Homebrew installation path not found"; \
+fi && \
+chmod +x /etc/profile.d/brew.sh && \
+# Also add to root's .bashrc
+if [ -d "/home/linuxbrew/.linuxbrew" ]; then \
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc; \
+elif [ -d "/root/.linuxbrew" ]; then \
+  echo 'eval "$(/root/.linuxbrew/bin/brew shellenv)"' >> /root/.bashrc; \
+fi
+
+# Set up Homebrew environment variables (covers both standard and root installation paths)
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/root/.linuxbrew/bin:/root/.linuxbrew/sbin:${PATH}"
+ENV HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+ENV HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
+ENV HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
+ENV HOMEBREW_NO_AUTO_UPDATE=1
+ENV HOMEBREW_NO_ANALYTICS=1
 
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 
